@@ -2,6 +2,12 @@
 
 <p align="center"><img src="src/Web/public/favicon.svg" alt="config-server" width="72"></p>
 
+<p align="center">
+  <a href="https://config.demo.andradev.io"><b>Try the live demo</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://buymeacoffee.com/andradev.io">Buy me a coffee</a>
+</p>
+
 A configuration server. It keeps **one default config per application** plus **small per-environment overrides** (only the fields that change). A client asks for an environment and receives the default merged with that override. It replaces manual, per-environment variable substitution in CI/CD releases.
 
 - **Formats:** JSON, YAML and `.env`, mixed freely; the response can be rendered as JSON, YAML or `.env`.
@@ -50,6 +56,10 @@ curl "http://localhost:5000/config/billing-service/prd?format=yaml"
 
 Production and Docker require OIDC (`Auth:Mode=Oidc`, `Auth:Oidc:Authority`, `ClientId`). Copy `.env.example` to `.env` (git-ignored) for local values; names use `__` for sections (`Auth__Oidc__Authority`). Setting up Keycloak, including the admin service account used by the Access screen: [docs/keycloak-setup.md](docs/keycloak-setup.md).
 
+## Live demo
+
+**https://config.demo.andradev.io** is a public sandbox: pick a persona (Viewer, Developer or Admin) on the sign-in page, and you get a private workspace of sample data to explore and edit. Nothing is shared between visitors, your workspace is discarded after a couple of hours without activity, and Access management and OIDC API keys are simulated. Please do not enter real secrets or real configuration.
+
 ## Public sandbox
 
 How the demo works, how to run it locally with Docker and how to deploy it to Kubernetes: [docs/demo.md](docs/demo.md). Images are published to `ghcr.io/andradev-io/config-server-*` and `andradevio/config-server-*` on Docker Hub when a `v*` release tag is pushed, together with a GitHub Release (generated notes).
@@ -63,6 +73,10 @@ npm --prefix src/Web run test
 ```
 
 Architecture notes, API contracts and gotchas are in [CLAUDE.md](CLAUDE.md). `tools/dev-idp` is a small local OIDC provider for testing sign-in without Keycloak.
+
+## Support
+
+If this project saves you time, you can [buy me a coffee](https://buymeacoffee.com/andradev.io). It helps keep the demo running.
 
 ## License
 
