@@ -93,7 +93,7 @@ Without containers (three terminals): `npm --prefix tools/demo-idp start`, the A
 
 ## Deploy to the cluster
 
-1. **Images.** The `demo-images` workflow (`.github/workflows/demo-images.yml`) builds and pushes the three images on every push to the default branch and on `v*` tags: `ghcr.io/andradev-io/config-server-{api-demo,web,demo-idp}` (always) and `andradevio/config-server-{api-demo,web,demo-idp}` on Docker Hub (only when the repository variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` exist). Tags: `latest`, branch, `sha-<short>`, `x.y.z` / `x.y`. Make the GHCR packages public (Package settings > Change visibility), otherwise create a pull secret in `config-demo` and uncomment the `imagePullSecrets` lines in the manifest.
+1. **Images.** The `demo-images` workflow (`.github/workflows/demo-images.yml`) builds and pushes the three images on every push to the default branch and on `v*` tags: `ghcr.io/andradev-io/config-server-{api-demo,web,demo-idp}` (always) and `andradevio/config-server-{api-demo,web,demo-idp}` on Docker Hub (only when the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` exist (repository or organization level)). Tags: `latest`, branch, `sha-<short>`, `x.y.z` / `x.y`. Make the GHCR packages public (Package settings > Change visibility), otherwise create a pull secret in `config-demo` and uncomment the `imagePullSecrets` lines in the manifest.
    To build by hand instead: `deploy/build.sh ghcr.io/andradev-io 0.1.0` (or `deploy/build.ps1`), then push.
 2. **Apply** (the manifest points at `ghcr.io/andradev-io/...:latest`; pin a tag or sha for anything long-lived):
 

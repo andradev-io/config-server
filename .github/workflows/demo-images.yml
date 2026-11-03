@@ -1,7 +1,7 @@
 name: demo-images
 
 # Builds the three sandbox images and pushes them to GitHub Container Registry (always) and Docker Hub (when the
-# DOCKERHUB_USERNAME variable and DOCKERHUB_TOKEN secret exist). Tags: `latest` + `main` on the default branch,
+# DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets exist). Tags: `latest` + `main` on the default branch,
 # `sha-<short>` on every build, `x.y.z` / `x.y` on `v*` tags. Pull requests only build (no push).
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
       - name: Docker Hub enabled?
         id: hub
         env:
-          USER: ${{ vars.DOCKERHUB_USERNAME }}
+          USER: ${{ secrets.DOCKERHUB_USERNAME }}
           TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           if [ -n "$USER" ] && [ -n "$TOKEN" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"; fi
@@ -62,7 +62,7 @@ jobs:
         if: github.event_name != 'pull_request' && steps.hub.outputs.enabled == 'true'
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Image names and tags
