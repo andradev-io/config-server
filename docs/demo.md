@@ -95,11 +95,11 @@ Without containers (three terminals): `npm --prefix tools/demo-idp start`, the A
 
 1. **Images.** The `demo-images` workflow (`.github/workflows/demo-images.yml`) builds and pushes the three images when a version tag is pushed (`git tag v0.1.0 && git push origin v0.1.0`); pull requests only build them to validate the Dockerfiles, and pushes to `main` publish nothing: `ghcr.io/andradev-io/config-server-{api-demo,web,demo-idp}` (always) and `andradevio/config-server-{api-demo,web,demo-idp}` on Docker Hub (only when the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` exist (repository or organization level)). Tags: `x.y.z`, `x.y`, `sha-<short>` and `latest` (not for pre-releases such as `v1.0.0-rc.1`). Make the GHCR packages public (Package settings > Change visibility), otherwise create a pull secret in `config-demo` and uncomment the `imagePullSecrets` lines in the manifest.
    To build by hand instead: `deploy/build.sh ghcr.io/andradev-io 0.1.0` (or `deploy/build.ps1`), then push.
-2. **Apply** (the manifest points at `ghcr.io/andradev-io/...:latest`; pin a tag or sha for anything long-lived):
+2. **Apply** (the manifest pins `docker.io/andradevio/config-server-*:0.1.0`, public; bump the three tags to upgrade):
 
    ```bash
    kubectl apply -f deploy/k8s/config-demo.yaml
-   kubectl -n config-demo rollout restart deploy   # pick up a new :latest
+   # after bumping the tags in the file: kubectl apply -f again (rollout restart only wipes workspaces and sessions)
    kubectl -n config-demo get pods
    ```
 

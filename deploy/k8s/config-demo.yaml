@@ -5,9 +5,10 @@
 # Nothing here is secret: no passwords, no keys, no real data. Single replica everywhere (workspaces, sessions and
 # signing keys are per process), so the strategy is Recreate and a restart signs everybody out.
 #
-# Images come from ghcr.io/andradev-io (built by .github/workflows/demo-images.yml; mirrored on Docker Hub as
-# andradevio/config-server-*). Pin a tag instead of :latest for anything long-lived.
-# If the packages are private, create the pull secret in the namespace and uncomment `imagePullSecrets` below.
+# Images are published on every release tag by .github/workflows/demo-images.yml to Docker Hub (andradevio/config-server-*,
+# public, used here) and GitHub Container Registry (ghcr.io/andradev-io/config-server-*, same tags). To upgrade, change the
+# three tags below (or `kubectl -n config-demo set image ...`) and apply. To pull from ghcr.io instead, make its packages
+# public or create a pull secret in the namespace and uncomment `imagePullSecrets` below.
 #
 # Namespace: `config-demo` is created here. To follow the helms repo naming (<project>-<env>) rename it everywhere
 # (and in docs/demo.md), or add the namespace to helms' namespaces/namespace.yaml and drop the first document.
@@ -116,8 +117,8 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: api
-          image: ghcr.io/andradev-io/config-server-api-demo:latest
-          imagePullPolicy: Always
+          image: docker.io/andradevio/config-server-api-demo:0.1.0
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef: { name: config-demo-api }
           ports:
@@ -185,8 +186,8 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: idp
-          image: ghcr.io/andradev-io/config-server-demo-idp:latest
-          imagePullPolicy: Always
+          image: docker.io/andradevio/config-server-demo-idp:0.1.0
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef: { name: config-demo-idp }
           ports:
@@ -241,8 +242,8 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web
-          image: ghcr.io/andradev-io/config-server-web:latest
-          imagePullPolicy: Always
+          image: docker.io/andradevio/config-server-web:0.1.0
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef: { name: config-demo-web }
           ports:
