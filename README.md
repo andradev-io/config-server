@@ -52,7 +52,7 @@ Production and Docker require OIDC (`Auth:Mode=Oidc`, `Auth:Oidc:Authority`, `Cl
 
 ## Public sandbox
 
-How the demo works, how to run it locally with Docker and how to deploy it to Kubernetes: [docs/demo.md](docs/demo.md). Images are published to `ghcr.io/andradev-io/config-server-*` and `andradevio/config-server-*` on Docker Hub.
+How the demo works, how to run it locally with Docker and how to deploy it to Kubernetes: [docs/demo.md](docs/demo.md). Images are published to `ghcr.io/andradev-io/config-server-*` and `andradevio/config-server-*` on Docker Hub when a `v*` release tag is pushed.
 
 ## Develop
 
