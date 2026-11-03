@@ -3,9 +3,9 @@
 A permanently running copy of the config server that anyone can try: sign in with a persona, get a private workspace of sample data, edit it freely, break it, and leave. Nothing in it is real and nothing in it is shared between visitors.
 
 ```
-                       https://config-demo.andradev.io
+                       https://config.demo.andradev.io
                                     |
-          Cloudflare Tunnel -> traefik-external (Ingress) or straight to the web Service
+          Cloudflare Tunnel (TLS at the edge) -> straight to the web Service, plain HTTP
                                     |
                     +---------------v----------------+
    browser -------> |  web: nginx (port 8080)        |  Vue UI (static), gzip, cache + security headers,
@@ -44,7 +44,7 @@ Everything is same origin: the UI is built with `VITE_API_BASE_URL=/`, so there 
 | web | `src/Web` (`Dockerfile`, `nginx/`) | Vue 3 build served by `nginxinc/nginx-unprivileged` on 8080; proxies `/api/`, `/config/`, `/health` to `DEMO_API_UPSTREAM` and `/idp/` to `DEMO_IDP_UPSTREAM` (defaults `config-demo-api:8080`, `config-demo-idp:9000`); `index.html` is `no-store`, `/assets/` immutable; CSP and friends; 30 req/s (burst 60) on the API and 5 req/s (burst 20) on the IdP per visitor address |
 | idp | `tools/demo-idp` | `oidc-provider`, see its README. In memory: a restart signs everyone out |
 | api | `deploy/Dockerfile.api-demo` | the regular API plus `demo-data/` at `/app/demo-data` (build context = repository root) |
-| manifests | `deploy/k8s/config-demo.yaml` | namespace `config-demo`, 3 Deployments (1 replica, non-root, read-only root filesystem), Services, Ingress, NetworkPolicies |
+| manifests | `deploy/k8s/config-demo.yaml` | namespace `config-demo`, 3 Deployments (1 replica, non-root, read-only root filesystem), Services, NetworkPolicies |
 | images | `deploy/build.sh` / `build.ps1` | builds the three images, no push |
 | local rehearsal | `deploy/docker-compose.demo.yaml` | whole sandbox on http://localhost:8080 |
 
@@ -55,7 +55,7 @@ All of them are in the ConfigMap of `deploy/k8s/config-demo.yaml` (`__` = sectio
 | Setting | Value | Why |
 | --- | --- | --- |
 | `Auth__Mode` | `Oidc` | Demo mode requires real tokens: every visitor needs a `sub` |
-| `Auth__Oidc__Authority` | `https://config-demo.andradev.io/idp` | exactly the issuer of the demo IdP (also what the SPA is told to use) |
+| `Auth__Oidc__Authority` | `https://config.demo.andradev.io/idp` | exactly the issuer of the demo IdP (also what the SPA is told to use) |
 | `Auth__Oidc__ClientId` | `config-demo-web` | public client of the demo IdP; the audience of its tokens (`Audience` falls back to it) |
 | `Auth__Oidc__RequireHttpsMetadata` | `true` (`false` only for the local compose) | |
 | `Auth__Oidc__RoleClaim` | `resource_access.{clientId}.roles` | the Keycloak-shaped roles the demo IdP emits (a flat `roles` claim exists too) |
@@ -64,18 +64,17 @@ All of them are in the ConfigMap of `deploy/k8s/config-demo.yaml` (`__` = sectio
 | `Demo__TemplatePath` | `/app/demo-data` | read-only seed baked into the image |
 | `Demo__WorkspacesPath` | `/workspaces` | writable, an `emptyDir` with a size limit |
 | `Demo__IdleTtlMinutes` | `120` | also reported to the UI banner |
-| `Demo__TokenEndpoint` | `https://config-demo.andradev.io/idp/token` | shown in the OIDC key `curl` snippets (the default assumes Keycloak's path) |
+| `Demo__TokenEndpoint` | `https://config.demo.andradev.io/idp/token` | shown in the OIDC key `curl` snippets (the default assumes Keycloak's path) |
 | `ApiKeys__StorePath` | `/tmp/api-keys.json` | only so nothing writes under a read-only `/app`; Demo mode keeps keys per workspace |
 
 Other `Demo__*` limits (`MaxWorkspaces`, `MaxBytesPerWorkspace`, `MaxFilesPerWorkspace`, `MaxApiKeysPerWorkspace`, `RequestsPerMinute`, `MaxRequestBodyBytes`, `Notice`) have safe defaults.
 
 ### How the API reaches the issuer
 
-The API validates tokens against the discovery document at `<Authority>/.well-known/openid-configuration`, and `Authority` must be the **public** issuer URL (it is also what the browser is told). Inside the cluster there are three ways to make that URL reachable from the API pod:
+The API validates tokens against the discovery document at `<Authority>/.well-known/openid-configuration`, and `Authority` must be the **public** issuer URL (it is also what the browser is told). To make that URL reachable from the API pod:
 
-1. **Through the public name (default of the manifest).** The pod resolves `config-demo.andradev.io` like any client and goes out through Cloudflare. It needs outbound internet from the pod and the tunnel route to be up; the discovery document and keys are cached and refreshed periodically, so a brief outage is tolerated after the first successful fetch.
-2. **`hostAliases` to the ingress.** Add `hostAliases: [{ip: <ClusterIP of the traefik-external Service>, hostnames: [config-demo.andradev.io]}]` to the API pod: the traffic stays in the cluster over TLS (the wildcard certificate matches). The IP changes if that Service is recreated.
-3. **A separate metadata address** (needs a small API change that does not exist yet: an `Auth:Oidc:MetadataAddress` such as `http://config-demo-idp:9000/idp/.well-known/openid-configuration` while keeping `Authority` public). Best option once available; setting `Authority` to the internal URL instead is not an option because the SPA would then be sent to it.
+1. **Through the public name (default of the manifest).** The pod resolves `config.demo.andradev.io` like any client and goes out through Cloudflare. It needs outbound internet from the pod and the tunnel route to be up; the discovery document and keys are cached and refreshed periodically, so a brief outage is tolerated after the first successful fetch.
+2. **Keeping the traffic inside the cluster.** The manifest has no Ingress (Cloudflare terminates TLS for `*.demo.andradev.io` and the tunnel talks plain HTTP to the web Service), so there is no in-cluster HTTPS endpoint for that name. `Auth:Oidc:MetadataAddress` exists, but the discovery document's `jwks_uri` is still the public URL, so it would not remove the dependency; option 1 is the supported way. If the pod cannot reach the internet, give the API pod `hostAliases` for `config.demo.andradev.io` pointing at a TLS endpoint you run in the cluster.
 
 The local compose avoids all of this by sharing one network namespace between web, api and idp.
 
@@ -103,10 +102,10 @@ Without containers (three terminals): `npm --prefix tools/demo-idp start`, the A
    kubectl -n config-demo get pods
    ```
 
-3. **Expose it.** In Cloudflare Zero Trust > Networks > Tunnels > `homelab` > Published application routes add `config-demo.andradev.io`, either to `https://traefik-external.traefik-external.svc.cluster.local:443` with Origin Server Name and HTTP Host Header `config-demo.andradev.io` (uses the Ingress, like `auth.lotties.app`), or straight to `http://config-demo-web.config-demo.svc.cluster.local:8080` (like the snake game). Never route the tunnel to the api or idp Services.
-4. **Check**: `https://config-demo.andradev.io/health` answers `Healthy`, `/idp/.well-known/openid-configuration` shows `https://config-demo.andradev.io/idp` as issuer, and signing in as each persona works.
+3. **Expose it.** In Cloudflare Zero Trust > Networks > Tunnels > `homelab` > Published application routes add `config.demo.andradev.io`, to `http://config-demo-web.config-demo.svc.cluster.local:8080` (straight to the Service, like the snake game; the TLS certificate is Cloudflare's edge certificate for `*.demo.andradev.io`, so create that Advanced Certificate first). Never route the tunnel to the api or idp Services.
+4. **Check**: `https://config.demo.andradev.io/health` answers `Healthy`, `/idp/.well-known/openid-configuration` shows `https://config.demo.andradev.io/idp` as issuer, and signing in as each persona works.
 
-Change the host name everywhere it appears in the manifest (`Auth__Oidc__Authority`, `Demo__TokenEndpoint`, `DEMO_IDP_ISSUER`, `DEMO_IDP_REDIRECT_URIS`, the Ingress) if you use another one: the issuer must be identical in the IdP, the API and what the browser uses.
+Change the host name everywhere it appears in the manifest (`Auth__Oidc__Authority`, `Demo__TokenEndpoint`, `DEMO_IDP_ISSUER`, `DEMO_IDP_REDIRECT_URIS`) if you use another one: the issuer must be identical in the IdP, the API and what the browser uses.
 
 ## Operating it
 

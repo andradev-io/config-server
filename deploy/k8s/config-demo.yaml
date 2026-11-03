@@ -1,7 +1,7 @@
-# Public sandbox of the config server, https://config-demo.andradev.io (see docs/demo.md).
+# Public sandbox of the config server, https://config.demo.andradev.io (see docs/demo.md).
 #   web  : nginx with the Vue UI; ONE public origin that proxies /api, /config, /health -> api and /idp -> idp
 #   api  : the config server API in Demo mode (every visitor gets a private, disposable workspace on an emptyDir)
-#   idp  : passwordless OIDC provider (persona picker), issuer https://config-demo.andradev.io/idp
+#   idp  : passwordless OIDC provider (persona picker), issuer https://config.demo.andradev.io/idp
 # Nothing here is secret: no passwords, no keys, no real data. Single replica everywhere (workspaces, sessions and
 # signing keys are per process), so the strategy is Recreate and a restart signs everybody out.
 #
@@ -13,14 +13,12 @@
 # Namespace: `config-demo` is created here. To follow the helms repo naming (<project>-<env>) rename it everywhere
 # (and in docs/demo.md), or add the namespace to helms' namespaces/namespace.yaml and drop the first document.
 #
-# Public exposure (Cloudflare Zero Trust > Networks > Tunnels > `homelab` > Published application routes), pick ONE:
-#   A) like auth.lotties.app: hostname config-demo.andradev.io -> service https://traefik-external.traefik-external.svc.cluster.local:443
-#      with Origin Server Name and HTTP Host Header `config-demo.andradev.io`. Uses the Ingress below
-#      (ingressClassName traefik-external, the *.andradev.io wildcard certificate of the TLSStore).
-#   B) like snake.web.games.andradev.io: hostname config-demo.andradev.io -> service
-#      http://config-demo-web.config-demo.svc.cluster.local:8080 (straight to the Service; the Ingress is then unused).
-#   Either way the tunnel creates the public DNS record. Never point a route at the api or idp Services directly: only
-#   nginx (web) applies the rate limits and the same-origin layout the SPA and the OIDC issuer rely on.
+# Public exposure: Cloudflare Zero Trust > Networks > Tunnels > `homelab` > Published application routes: hostname
+# config.demo.andradev.io -> service http://config-demo-web.config-demo.svc.cluster.local:8080 (like snake.web.games.andradev.io:
+# straight to the Service, plain HTTP inside the cluster). The TLS certificate is Cloudflare's edge certificate for
+# *.demo.andradev.io (Advanced Certificate Manager), so there is no Ingress and nothing to add to the cluster's TLSStore.
+# The tunnel creates the public DNS record. Never point a route at the api or idp Services directly: only
+# nginx (web) applies the rate limits and the same-origin layout the SPA and the OIDC issuer rely on.
 #
 # Ops:
 #   kubectl -n config-demo get pods
@@ -48,7 +46,7 @@ data:
   # in the tokens). The API fetches the discovery document from that same URL (through Cloudflare, or see docs/demo.md
   # "How the API reaches the issuer" for the in-cluster alternatives).
   Auth__Mode: Oidc
-  Auth__Oidc__Authority: https://config-demo.andradev.io/idp
+  Auth__Oidc__Authority: https://config.demo.andradev.io/idp
   Auth__Oidc__ClientId: config-demo-web
   Auth__Oidc__RequireHttpsMetadata: "true"
   Auth__Oidc__RoleClaim: resource_access.{clientId}.roles
@@ -60,7 +58,7 @@ data:
   Demo__WorkspacesPath: /workspaces
   Demo__IdleTtlMinutes: "120"
   Demo__MaxWorkspaces: "200"
-  Demo__TokenEndpoint: https://config-demo.andradev.io/idp/token
+  Demo__TokenEndpoint: https://config.demo.andradev.io/idp/token
   ApiKeys__StorePath: /tmp/api-keys.json
   # Real client address for the rate limiter: the API is reachable only through the web nginx (Service is ClusterIP,
   # no other ingress), which sets X-Forwarded-For. Do not enable TrustAllProxies if you expose the API any other way.
@@ -75,8 +73,8 @@ metadata:
   namespace: config-demo
 data:
   PORT: "9000"
-  DEMO_IDP_ISSUER: https://config-demo.andradev.io/idp
-  DEMO_IDP_REDIRECT_URIS: https://config-demo.andradev.io/
+  DEMO_IDP_ISSUER: https://config.demo.andradev.io/idp
+  DEMO_IDP_REDIRECT_URIS: https://config.demo.andradev.io/
   DEMO_IDP_TRUST_PROXY: "true"
   DEMO_IDP_ACCESS_TOKEN_TTL: "900"
   DEMO_IDP_SESSION_TTL: "28800"
@@ -281,27 +279,6 @@ spec:
   selector: { app: config-demo-web }
   ports:
     - { name: http, port: 8080, targetPort: http }
----
-# Route A of the header comment (traefik-external; TLS from the *.andradev.io wildcard in its TLSStore).
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: config-demo
-  namespace: config-demo
-spec:
-  ingressClassName: traefik-external
-  tls:
-    - hosts: [config-demo.andradev.io]
-  rules:
-    - host: config-demo.andradev.io
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: config-demo-web
-                port: { name: http }
 ---
 # ---------------------------------------------------------------- network policy (ignored by CNIs without support)
 # api and idp only accept traffic from the web pod. web accepts everything (Traefik / cloudflared come from other namespaces).

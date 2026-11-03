@@ -30,7 +30,7 @@ npm --prefix tools/demo-idp test       # unit tests + a full code+PKCE flow agai
 | --- | --- | --- |
 | `PORT` | `9000` | Listen port |
 | `DEMO_IDP_ISSUER` | `http://localhost:$PORT/idp` | Public issuer URL; its path is the mount prefix. Must be exactly what the API and the SPA use as `Authority` |
-| `DEMO_IDP_REDIRECT_URIS` | `http://localhost:5173/` | Comma/space separated redirect and post-logout URIs of the SPA (e.g. `https://config-demo.andradev.io/`) |
+| `DEMO_IDP_REDIRECT_URIS` | `http://localhost:5173/` | Comma/space separated redirect and post-logout URIs of the SPA (e.g. `https://config.demo.andradev.io/`) |
 | `DEMO_IDP_TRUST_PROXY` | `true` | Honour `X-Forwarded-Proto/Host` (needed behind Traefik/Cloudflare so cookies get `Secure`); `false` for plain local use |
 | `DEMO_IDP_COOKIE_KEYS` | random per start | Optional cookie signing keys |
 | `DEMO_IDP_ACCESS_TOKEN_TTL` | `900` | Access/ID token lifetime (seconds) |
