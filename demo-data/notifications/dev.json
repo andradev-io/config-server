@@ -1,0 +1,4 @@
+{
+  "logging": { "minimumLevel": "debug" },
+  "smtp": { "host": "mailhog.demo.internal" }
+}

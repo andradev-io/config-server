@@ -1,0 +1,6 @@
+{
+  "logging": { "minimumLevel": "error" },
+  "smtp": { "host": "smtp.demo.internal", "port": 587, "useTls": true },
+  "queue": { "uri": "amqp://rabbit.demo.internal:5672", "prefetch": 50 },
+  "templates": { "retryDelaysSeconds": [10, 60, 300, 900] }
+}

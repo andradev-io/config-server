@@ -1,0 +1,20 @@
+# API image for the public sandbox: the regular API plus the read-only seed data at /app/demo-data.
+# Build context: the REPOSITORY ROOT (so demo-data/ is reachable), not src/:
+#   docker build -f deploy/Dockerfile.api-demo -t config-server-api-demo .
+# The regular src/Application/ConfigServer.Application.Api/Dockerfile is untouched.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY src/ .
+RUN dotnet publish Application/ConfigServer.Application.Api/ConfigServer.Application.Api.csproj -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --from=build /app/publish .
+COPY demo-data /app/demo-data
+# Non-root user shipped with the .NET images (uid 1654). Writes go to Demo__WorkspacesPath and /tmp only.
+ENV ASPNETCORE_URLS=http://+:8080 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    HOME=/tmp
+USER app
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "ConfigServer.Application.Api.dll"]

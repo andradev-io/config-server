@@ -1,0 +1,47 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "config-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project", "src/Application/ConfigServer.Application.Api",
+        "--urls", "http://localhost:5000",
+        "--environment", "Development",
+        "--ConfigSource:Path=E:/_Development/_repos/dev-vinicius-andrade/config-server-files-local"
+      ],
+      "port": 5000
+    },
+    {
+      "name": "dev-idp",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "tools/dev-idp", "start"],
+      "port": 9000
+    },
+    {
+      "name": "config-api-oidc",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project", "src/Application/ConfigServer.Application.Api",
+        "--urls", "http://localhost:5000",
+        "--environment", "Development",
+        "--ConfigSource:Path=E:/_Development/_repos/dev-vinicius-andrade/config-server-files-local",
+        "--Auth:Mode=Oidc",
+        "--Auth:Oidc:Authority=http://localhost:9000",
+        "--Auth:Oidc:Audience=http://localhost:5000",
+        "--Auth:Oidc:ClientId=config-web",
+        "--Auth:Oidc:RequireHttpsMetadata=false",
+        "--Auth:Oidc:RoleClaim=resource_access.{clientId}.roles"
+      ],
+      "port": 5000
+    },
+    {
+      "name": "config-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "src/Web", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}

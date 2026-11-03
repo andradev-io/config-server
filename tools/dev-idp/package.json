@@ -1,0 +1,8 @@
+{
+  "name": "dev-idp",
+  "private": true,
+  "type": "module",
+  "description": "Local OIDC provider for testing config-server auth (no Docker/Keycloak needed). Dev only.",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "oidc-provider": "9.13.3" }
+}

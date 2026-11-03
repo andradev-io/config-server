@@ -1,0 +1,337 @@
+# Public sandbox of the config server, https://config-demo.andradev.io (see docs/demo.md).
+#   web  : nginx with the Vue UI; ONE public origin that proxies /api, /config, /health -> api and /idp -> idp
+#   api  : the config server API in Demo mode (every visitor gets a private, disposable workspace on an emptyDir)
+#   idp  : passwordless OIDC provider (persona picker), issuer https://config-demo.andradev.io/idp
+# Nothing here is secret: no passwords, no keys, no real data. Single replica everywhere (workspaces, sessions and
+# signing keys are per process), so the strategy is Recreate and a restart signs everybody out.
+#
+# Images come from ghcr.io/andradev-io (built by .github/workflows/demo-images.yml; mirrored on Docker Hub as
+# andradevio/config-server-*). Pin a tag instead of :latest for anything long-lived.
+# If the packages are private, create the pull secret in the namespace and uncomment `imagePullSecrets` below.
+#
+# Namespace: `config-demo` is created here. To follow the helms repo naming (<project>-<env>) rename it everywhere
+# (and in docs/demo.md), or add the namespace to helms' namespaces/namespace.yaml and drop the first document.
+#
+# Public exposure (Cloudflare Zero Trust > Networks > Tunnels > `homelab` > Published application routes), pick ONE:
+#   A) like auth.lotties.app: hostname config-demo.andradev.io -> service https://traefik-external.traefik-external.svc.cluster.local:443
+#      with Origin Server Name and HTTP Host Header `config-demo.andradev.io`. Uses the Ingress below
+#      (ingressClassName traefik-external, the *.andradev.io wildcard certificate of the TLSStore).
+#   B) like snake.web.games.andradev.io: hostname config-demo.andradev.io -> service
+#      http://config-demo-web.config-demo.svc.cluster.local:8080 (straight to the Service; the Ingress is then unused).
+#   Either way the tunnel creates the public DNS record. Never point a route at the api or idp Services directly: only
+#   nginx (web) applies the rate limits and the same-origin layout the SPA and the OIDC issuer rely on.
+#
+# Ops:
+#   kubectl -n config-demo get pods
+#   kubectl -n config-demo rollout restart deploy/config-demo-api deploy/config-demo-idp   # wipes every workspace and session
+#   kubectl -n config-demo rollout undo deploy/config-demo-web                              # roll back one component
+#   kubectl delete namespace config-demo                                                    # remove the sandbox
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: config-demo
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+---
+# ---------------------------------------------------------------- configuration (no secrets)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-demo-api
+  namespace: config-demo
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_URLS: http://+:8080
+  HOME: /tmp
+  # Sign-in: tokens of the demo IdP. The issuer is the PUBLIC URL (the SPA gets it from api/auth/info and the IdP stamps it
+  # in the tokens). The API fetches the discovery document from that same URL (through Cloudflare, or see docs/demo.md
+  # "How the API reaches the issuer" for the in-cluster alternatives).
+  Auth__Mode: Oidc
+  Auth__Oidc__Authority: https://config-demo.andradev.io/idp
+  Auth__Oidc__ClientId: config-demo-web
+  Auth__Oidc__RequireHttpsMetadata: "true"
+  Auth__Oidc__RoleClaim: resource_access.{clientId}.roles
+  # The sandbox simulates identity management (Access screen, OIDC keys) itself and must never touch a real IdP.
+  IdentityAdmin__Provider: None
+  # Visitors' workspaces: seeded from the read-only /app/demo-data baked into the image, kept on an emptyDir.
+  Demo__Enabled: "true"
+  Demo__TemplatePath: /app/demo-data
+  Demo__WorkspacesPath: /workspaces
+  Demo__IdleTtlMinutes: "120"
+  Demo__MaxWorkspaces: "200"
+  Demo__TokenEndpoint: https://config-demo.andradev.io/idp/token
+  ApiKeys__StorePath: /tmp/api-keys.json
+  # Real client address for the rate limiter: the API is reachable only through the web nginx (Service is ClusterIP,
+  # no other ingress), which sets X-Forwarded-For. Do not enable TrustAllProxies if you expose the API any other way.
+  ForwardedHeaders__Enabled: "true"
+  ForwardedHeaders__TrustAllProxies: "true"
+  ForwardedHeaders__ForwardLimit: "2"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-demo-idp
+  namespace: config-demo
+data:
+  PORT: "9000"
+  DEMO_IDP_ISSUER: https://config-demo.andradev.io/idp
+  DEMO_IDP_REDIRECT_URIS: https://config-demo.andradev.io/
+  DEMO_IDP_TRUST_PROXY: "true"
+  DEMO_IDP_ACCESS_TOKEN_TTL: "900"
+  DEMO_IDP_SESSION_TTL: "28800"
+  DEMO_IDP_LOGINS_PER_10_MIN: "30"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-demo-web
+  namespace: config-demo
+data:
+  DEMO_API_UPSTREAM: config-demo-api:8080
+  DEMO_IDP_UPSTREAM: config-demo-idp:9000
+---
+# ---------------------------------------------------------------- api
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-demo-api
+  namespace: config-demo
+  labels: { app: config-demo-api }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: config-demo-api }
+  template:
+    metadata:
+      labels: { app: config-demo-api }
+    spec:
+      # imagePullSecrets: [{ name: registry-pull }]
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654 # the `app` user of the .NET images
+        runAsGroup: 1654
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: api
+          image: ghcr.io/andradev-io/config-server-api-demo:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef: { name: config-demo-api }
+          ports:
+            - { name: http, containerPort: 8080 }
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 3
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: workspaces, mountPath: /workspaces }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: workspaces
+          emptyDir: { sizeLimit: 768Mi } # Demo__MaxWorkspaces x per-workspace cap stays well below this
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-demo-api
+  namespace: config-demo
+spec:
+  selector: { app: config-demo-api }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+# ---------------------------------------------------------------- idp
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-demo-idp
+  namespace: config-demo
+  labels: { app: config-demo-idp }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: config-demo-idp }
+  template:
+    metadata:
+      labels: { app: config-demo-idp }
+    spec:
+      # imagePullSecrets: [{ name: registry-pull }]
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000 # the `node` user of the node images
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: idp
+          image: ghcr.io/andradev-io/config-server-demo-idp:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef: { name: config-demo-idp }
+          ports:
+            - { name: http, containerPort: 9000 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { memory: 192Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-demo-idp
+  namespace: config-demo
+spec:
+  selector: { app: config-demo-idp }
+  ports:
+    - { name: http, port: 9000, targetPort: http }
+---
+# ---------------------------------------------------------------- web (the only public component)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-demo-web
+  namespace: config-demo
+  labels: { app: config-demo-web }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: config-demo-web }
+  template:
+    metadata:
+      labels: { app: config-demo-web }
+    spec:
+      # imagePullSecrets: [{ name: registry-pull }]
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101 # nginx-unprivileged
+        runAsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/andradev-io/config-server-web:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef: { name: config-demo-web }
+          ports:
+            - { name: http, containerPort: 8080 }
+          readinessProbe:
+            httpGet: { path: /nginx-health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /nginx-health, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            # nginx writes its pid, temp files and the rendered default.conf (from the template) at start.
+            - { name: tmp, mountPath: /tmp }
+            - { name: conf, mountPath: /etc/nginx/conf.d }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 32Mi }
+        - name: conf
+          emptyDir: { sizeLimit: 1Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-demo-web
+  namespace: config-demo
+spec:
+  selector: { app: config-demo-web }
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+# Route A of the header comment (traefik-external; TLS from the *.andradev.io wildcard in its TLSStore).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: config-demo
+  namespace: config-demo
+spec:
+  ingressClassName: traefik-external
+  tls:
+    - hosts: [config-demo.andradev.io]
+  rules:
+    - host: config-demo.andradev.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: config-demo-web
+                port: { name: http }
+---
+# ---------------------------------------------------------------- network policy (ignored by CNIs without support)
+# api and idp only accept traffic from the web pod. web accepts everything (Traefik / cloudflared come from other namespaces).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: config-demo-api-from-web
+  namespace: config-demo
+spec:
+  podSelector:
+    matchLabels: { app: config-demo-api }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: config-demo-web }
+      ports:
+        - { protocol: TCP, port: 8080 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: config-demo-idp-from-web
+  namespace: config-demo
+spec:
+  podSelector:
+    matchLabels: { app: config-demo-idp }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: config-demo-web }
+      ports:
+        - { protocol: TCP, port: 9000 }

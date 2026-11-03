@@ -1,0 +1,15 @@
+app:
+  name: Demo Portal
+  baseUrl: http://localhost:3000
+  theme: light
+api:
+  billingUrl: http://localhost:5001
+  notificationsUrl: http://localhost:5002
+  timeoutMs: 8000
+analytics:
+  enabled: false
+  apiKey: <set-in-vault>
+featureFlags:
+  newCheckout: false
+  darkMode: true
+  betaBanner: false

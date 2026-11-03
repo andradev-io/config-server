@@ -1,0 +1,9 @@
+app:
+  baseUrl: https://portal.demo.example
+api:
+  billingUrl: https://billing.demo.example
+  notificationsUrl: https://notifications.demo.example
+  timeoutMs: 5000
+analytics:
+  enabled: true
+  apiKey: <set-in-vault>

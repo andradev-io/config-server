@@ -1,0 +1,12 @@
+{
+  "variables": [
+    { "key": "logging.minimumLevel", "type": "string", "required": true, "secret": false, "description": "Minimum log level", "environments": null },
+    { "key": "database.host", "type": "string", "required": true, "secret": false, "description": "Database host", "environments": null },
+    { "key": "database.port", "type": "number", "required": true, "secret": false, "description": "Database port", "environments": null },
+    { "key": "database.password", "type": "string", "required": true, "secret": true, "description": "Database password (placeholder: use a secret manager)", "environments": ["prd"] },
+    { "key": "database.pool.max", "type": "number", "required": false, "secret": false, "description": "Maximum pooled connections", "environments": null },
+    { "key": "payments.provider", "type": "string", "required": true, "secret": false, "description": "Payment provider", "environments": null },
+    { "key": "payments.timeoutSeconds", "type": "number", "required": false, "secret": false, "description": "Provider call timeout", "environments": null },
+    { "key": "features", "type": "array", "required": false, "secret": false, "description": "Enabled feature flags", "environments": null }
+  ]
+}

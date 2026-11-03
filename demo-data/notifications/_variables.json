@@ -1,0 +1,11 @@
+{
+  "variables": [
+    { "key": "logging.minimumLevel", "type": "string", "required": true, "secret": false, "description": "Minimum log level", "environments": null },
+    { "key": "smtp.host", "type": "string", "required": true, "secret": false, "description": "SMTP host", "environments": null },
+    { "key": "smtp.port", "type": "number", "required": true, "secret": false, "description": "SMTP port", "environments": null },
+    { "key": "smtp.useTls", "type": "boolean", "required": false, "secret": false, "description": "Use TLS for SMTP", "environments": null },
+    { "key": "smtp.password", "type": "string", "required": true, "secret": true, "description": "SMTP password (placeholder: use a secret manager)", "environments": ["stg", "prd"] },
+    { "key": "queue.uri", "type": "string", "required": true, "secret": false, "description": "Message broker URI", "environments": null },
+    { "key": "templates.retryDelaysSeconds", "type": "array", "required": false, "secret": false, "description": "Delivery retry back-off", "environments": null }
+  ]
+}

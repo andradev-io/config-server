@@ -1,0 +1,10 @@
+{
+  "variables": [
+    { "key": "app.baseUrl", "type": "string", "required": true, "secret": false, "description": "Public URL of the portal", "environments": null },
+    { "key": "api.billingUrl", "type": "string", "required": true, "secret": false, "description": "Billing service URL", "environments": null },
+    { "key": "api.timeoutMs", "type": "number", "required": false, "secret": false, "description": "API call timeout", "environments": null },
+    { "key": "analytics.enabled", "type": "boolean", "required": false, "secret": false, "description": "Send usage analytics", "environments": null },
+    { "key": "analytics.apiKey", "type": "string", "required": false, "secret": true, "description": "Analytics key (placeholder: use a secret manager)", "environments": ["prd"] },
+    { "key": "featureFlags.newCheckout", "type": "boolean", "required": false, "secret": false, "description": "Enable the new checkout", "environments": null }
+  ]
+}

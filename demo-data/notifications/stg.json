@@ -1,0 +1,4 @@
+{
+  "smtp": { "host": "smtp.stg.demo.internal", "useTls": true },
+  "queue": { "uri": "amqp://rabbit.stg.demo.internal:5672" }
+}

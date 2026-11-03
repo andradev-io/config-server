@@ -1,0 +1,17 @@
+logging:
+  minimumLevel: warning
+database:
+  host: localhost
+  port: 5432
+  name: billing
+  password: <set-in-vault>
+  pool:
+    min: 2
+    max: 10
+payments:
+  provider: sandbox-pay
+  timeoutSeconds: 30
+  retries: 3
+features:
+  - invoices
+  - refunds

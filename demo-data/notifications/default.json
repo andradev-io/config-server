@@ -1,0 +1,11 @@
+{
+  "logging": { "minimumLevel": "warning" },
+  "smtp": {
+    "host": "localhost",
+    "port": 25,
+    "useTls": false,
+    "password": "<set-in-vault>"
+  },
+  "queue": { "uri": "amqp://localhost:5672", "name": "notifications", "prefetch": 10 },
+  "templates": { "locale": "en-US", "retryDelaysSeconds": [5, 30, 120] }
+}

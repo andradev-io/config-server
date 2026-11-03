@@ -1,0 +1,5 @@
+app:
+  baseUrl: http://localhost:3000
+featureFlags:
+  newCheckout: true
+  betaBanner: true

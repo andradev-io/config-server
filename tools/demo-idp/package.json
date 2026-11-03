@@ -1,0 +1,14 @@
+{
+  "name": "demo-idp",
+  "private": true,
+  "type": "module",
+  "description": "Passwordless OIDC provider for the public config-server sandbox: every sign-in creates a throwaway visitor with a persona (viewer, developer, admin).",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "oidc-provider": "9.13.3"
+  }
+}

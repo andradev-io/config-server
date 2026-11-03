@@ -1,0 +1,60 @@
+# Local rehearsal of the public sandbox: http://localhost:8080
+#   docker compose -f deploy/docker-compose.demo.yaml up --build
+#   docker compose -f deploy/docker-compose.demo.yaml down
+#
+# api and idp share the network namespace of `web`, so inside the API "localhost:8080" IS the nginx that serves the
+# IdP under /idp: the API can fetch the same issuer URL the browser uses (http://localhost:8080/idp) without any
+# extra DNS or hairpin trick. In the cluster this is solved by the public host name instead (see docs/demo.md).
+name: config-server-demo
+
+services:
+  web:
+    build:
+      context: ../src/Web
+      args:
+        VITE_API_BASE_URL: /
+    environment:
+      DEMO_API_UPSTREAM: 127.0.0.1:5000
+      DEMO_IDP_UPSTREAM: 127.0.0.1:9000
+    ports:
+      - "8080:8080"
+    # No depends_on: api and idp join this container's network namespace, so they already start after it.
+    restart: unless-stopped
+
+  idp:
+    build:
+      context: ../tools/demo-idp
+    network_mode: "service:web"
+    environment:
+      PORT: "9000"
+      DEMO_IDP_ISSUER: http://localhost:8080/idp
+      DEMO_IDP_REDIRECT_URIS: http://localhost:8080/
+      DEMO_IDP_TRUST_PROXY: "false"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api-demo
+    network_mode: "service:web"
+    environment:
+      ASPNETCORE_URLS: http://+:5000
+      ASPNETCORE_ENVIRONMENT: Production
+      Auth__Mode: Oidc
+      Auth__Oidc__Authority: http://localhost:8080/idp
+      Auth__Oidc__ClientId: config-demo-web
+      Auth__Oidc__RequireHttpsMetadata: "false"
+      Auth__Oidc__RoleClaim: resource_access.{clientId}.roles
+      IdentityAdmin__Provider: None
+      Demo__Enabled: "true"
+      Demo__TemplatePath: /app/demo-data
+      Demo__WorkspacesPath: /workspaces
+      Demo__IdleTtlMinutes: "30"
+      Demo__TokenEndpoint: http://localhost:8080/idp/token
+      ForwardedHeaders__Enabled: "true"
+      ForwardedHeaders__TrustAllProxies: "true"
+    tmpfs:
+      - /workspaces:mode=1777,size=512m
+      - /tmp:mode=1777,size=64m
+    read_only: true
+    restart: unless-stopped

@@ -1,0 +1,11 @@
+**/node_modules
+**/bin
+**/obj
+**/dist
+**/.vs
+**/.env
+.git
+src/Web
+tools
+docs
+deploy

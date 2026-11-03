@@ -1,0 +1,7 @@
+{
+  "environments": [
+    { "name": "dev", "description": "Development", "order": 1 },
+    { "name": "stg", "description": "Staging", "order": 2 },
+    { "name": "prd", "description": "Production", "order": 3 }
+  ]
+}

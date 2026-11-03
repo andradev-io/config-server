@@ -1,0 +1,8 @@
+database:
+  host: stg-db.demo.internal
+payments:
+  timeoutSeconds: 45
+features:
+  - invoices
+  - refunds
+  - beta-reports

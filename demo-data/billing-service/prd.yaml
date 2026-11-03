@@ -1,0 +1,10 @@
+logging:
+  minimumLevel: error
+database:
+  host: prd-db.demo.internal
+  password: <set-in-vault>
+  pool:
+    max: 50
+payments:
+  provider: live-pay
+  timeoutSeconds: 60
