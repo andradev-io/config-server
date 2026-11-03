@@ -89,6 +89,28 @@ data:
   DEMO_API_UPSTREAM: config-demo-api:8080
   DEMO_IDP_UPSTREAM: config-demo-idp:9000
 ---
+# One extra access-log line per sign-in (POST /idp/interaction/<uid>/login), with the persona picked. The body of that POST is
+# only `persona=<name>`. Alloy ships it to Loki with the rest of the pod logs. Every sign-in creates a new visitor, so counting
+# these lines counts visitors. Grafana (Loki):
+#   sum by (persona) (count_over_time({namespace="config-demo"} |= "login_audit" | regexp `persona=(?P<persona>\w+) status=303` [24h]))
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-demo-web-analytics
+  namespace: config-demo
+data:
+  analytics.conf: |
+    map "$request_method:$uri" $login_audit {
+        default 0;
+        "~^POST:/idp/interaction/[^/]+/login$" 1;
+    }
+    map $request_body $login_persona {
+        default other;
+        "~(?:^|&)persona=(?<p>[a-z]+)" $p;
+    }
+    log_format login_audit 'login_audit persona=$login_persona status=$status';
+    access_log /dev/stdout login_audit if=$login_audit;
+---
 # ---------------------------------------------------------------- api
 apiVersion: apps/v1
 kind: Deployment
@@ -264,7 +286,10 @@ spec:
             # nginx writes its pid, temp files and the rendered default.conf (from the template) at start.
             - { name: tmp, mountPath: /tmp }
             - { name: conf, mountPath: /etc/nginx/conf.d }
+            - { name: analytics, mountPath: /etc/nginx/conf.d/analytics.conf, subPath: analytics.conf, readOnly: true }
       volumes:
+        - name: analytics
+          configMap: { name: config-demo-web-analytics }
         - name: tmp
           emptyDir: { sizeLimit: 32Mi }
         - name: conf
